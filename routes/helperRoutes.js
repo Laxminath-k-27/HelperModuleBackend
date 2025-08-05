@@ -83,8 +83,9 @@ router.post(
 
       const newEmployeeSummary = new EmployeeSummary({
         employeeId,
-        fullName: req.body.fullName,
-        services
+        fullName,
+        services,
+        photo: req.files['photo']?.[0]?.path
       })
 
       newEmployeeSummary.save();
@@ -106,5 +107,30 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch helpers' });
   }
 });
+
+router.get('/:employeeId', async(req,res) => {
+    try {
+        const {employeeId} = req.params;
+        const helper = await Helper.find({employeeId: employeeId})
+        console.log(helper)
+        res.status(200).json({data: helper});
+    } catch (error) {
+        res.status(500).json({ err: 'EmployeeId not found'});
+    }
+})
+
+
+router.delete('/:employeeId', async (req,res) => {
+    try {
+        const {employeeId} = req.params;
+        const helper = await Helper.deleteMany({employeeId: employeeId});
+        const helperSummary = await EmployeeSummary.deleteMany({employeeId: employeeId});
+        console.log(helper.acknowledged)
+        res.status(200).json({ message: helper.acknowledged+" "+helperSummary.acknowledged})
+    } catch (error) {
+        res.status(500).json({ err: 'Error occured' });
+    }
+    
+})
 
 module.exports = router;
