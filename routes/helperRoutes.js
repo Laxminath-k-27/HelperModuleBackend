@@ -112,12 +112,85 @@ router.get('/:employeeId', async(req,res) => {
     try {
         const {employeeId} = req.params;
         const helper = await Helper.find({employeeId: employeeId})
-        console.log(helper)
+        
+        console.log("sent data"+helper)
         res.status(200).json({data: helper});
     } catch (error) {
         res.status(500).json({ err: 'EmployeeId not found'});
     }
 })
+
+
+router.patch('/:employeeId', upload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'kycDocument', maxCount: 1 },
+    { name: 'otherDocument', maxCount: 1 }]), async (req, res) => {
+
+    const { employeeId } = req.params;
+
+    try {
+      const {
+        fullName,
+        email,
+        services,
+        organization,
+        languages,
+        gender,
+        phonePrefix,
+        phoneNumber,
+        vehicleType,
+        vehicleNumber,
+        kycDocType,
+        otherDocType
+      } = req.body;
+
+      const existingHelper = await Helper.findOne({ employeeId });
+
+      if (!existingHelper) {
+        return res.status(404).json({ message: 'Helper not found' });
+      }
+
+      const updatedFields = {
+        fullName,
+        email,
+        services: JSON.parse(services || '[]'),
+        organization,
+        languages: JSON.parse(languages || '[]'),
+        gender,
+        phonePrefix,
+        phoneNumber,
+        vehicleType,
+        vehicleNumber,
+        kycDocType,
+        otherDocType,
+        photo: req.files['photo']?.[0]?.path,
+        kycDocument: req.files['kycDocument']?.[0]?.path,
+        otherDocument: req.files['otherDocument']?.[0]?.path
+      };
+
+      const updatedHelper = await Helper.findOneAndUpdate(
+        { employeeId },
+        updatedFields,
+        { new: true }
+      );
+
+      await EmployeeSummary.findOneAndUpdate(
+        { employeeId },
+        {
+          fullName,
+          services: JSON.parse(services || '[]'),
+          photo: updatedFields.photo
+        }
+      );
+
+      res.status(200).json({ message: 'Helper updated successfully', updatedHelper });
+
+    } catch (error) {
+      console.error('Error updating helper:', error);
+      res.status(500).json({ message: 'Failed to update helper' });
+    }
+  }
+);
 
 
 router.delete('/:employeeId', async (req,res) => {
