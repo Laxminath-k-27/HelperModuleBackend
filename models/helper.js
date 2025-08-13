@@ -4,7 +4,7 @@ const helperSchema = new mongoose.Schema({
     employeeId: String,
     fullName: String,
     email: String,
-    services: [String],
+    services: String,
     organization: String,
     languages: [String],
     gender: String,
@@ -16,7 +16,8 @@ const helperSchema = new mongoose.Schema({
     kycDocument: String,
     kycDocType: String,
     otherDocument: String,
-    otherDocType: String
+    otherDocType: String,
+    joinedDate: {type: Date, default: Date.now}
 });
 
 module.exports = mongoose.model('Helper', helperSchema);

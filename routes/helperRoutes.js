@@ -64,7 +64,7 @@ router.post(
         employeeId,
         fullName,
         email,
-        services: JSON.parse(services || '[]'),
+        services,
         organization,
         languages: JSON.parse(languages || '[]'),
         gender,
@@ -85,14 +85,15 @@ router.post(
         employeeId,
         fullName,
         services,
-        photo: req.files['photo']?.[0]?.path
+        photo: req.files['photo']?.[0]?.path,
+        phoneNumber
       })
 
       newEmployeeSummary.save();
 
-      res.status(201).json({ message: 'Helper and Helper Summary saved successfully', employeeId });
+      res.status(201).json({ message: 'Helper and Helper Summary saved successfully', employeeId: employeeId });
     } catch (error) {
-      console.error(error);
+    //   console.error(error);
       res.status(500).json({ error: 'Failed to save helper' });
     }
   }
@@ -101,7 +102,7 @@ router.post(
 router.get('/', async (req, res) => {
   try {
     const helpersList = await EmployeeSummary.find();
-    console.log(helpersList)
+    // console.log(helpersList)
     res.json(helpersList);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch helpers' });
@@ -113,12 +114,108 @@ router.get('/:employeeId', async(req,res) => {
         const {employeeId} = req.params;
         const helper = await Helper.find({employeeId: employeeId})
         
-        console.log("sent data"+helper)
+        // console.log(typeof helper)
         res.status(200).json({data: helper});
     } catch (error) {
         res.status(500).json({ err: 'EmployeeId not found'});
     }
 })
+
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+
+router.get('/search/:searchString', async (req,res) => {
+    try {
+        const { searchString } =req.params;
+        const escapedSearch = escapeRegex(searchString); // Escape chars
+        const regex = new RegExp(escapedSearch, 'i'); // for sensitive partial search
+
+        const empret = await EmployeeSummary.find({ employeeId: { $regex: regex }});
+        const nameret = await EmployeeSummary.find({ fullName: { $regex: regex }});
+        const phoneret = await EmployeeSummary.find({ phoneNumber: { $regex: regex }});
+
+        const combined = [...empret, ...nameret, ...phoneret];
+        
+        const uniqueMap = new Map();
+
+        combined.forEach(doc => {
+            uniqueMap.set(doc._id.toString(), doc);
+        });
+
+        const uniqueResults = Array.from(uniqueMap.values());
+
+        // console.log('uni '+uniqueResults);
+
+        res.status(200).json(uniqueResults);
+
+    } catch (error) {
+
+        res.status(500).json({ error: 'Failure' });
+        
+    }
+})
+
+router.get("/filter/helpers", async (req, res) => {
+  try {
+    console.log("Query Parameters:", req.query);
+    let { services = "", organizations = "" } = req.query;
+
+    services = services.split(",").filter(Boolean);
+    organizations = organizations.split(",").filter(Boolean);
+
+    console.log("Services:", services);
+    console.log("Organizations:", organizations);
+
+    const matchStage = {};
+
+    if (services.length && organizations.length) {
+      matchStage.$and = [
+        { services: { $in: services } },
+        { organization: { $in: organizations } }
+      ];
+    } else if (services.length) {
+      matchStage.services = { $in: services };
+    } else if (organizations.length) {
+      matchStage.organization = { $in: organizations };
+    }
+
+    const pipeline = [
+        { $match: matchStage },
+        {
+            $lookup: {
+            from: 'employeessummaries',
+            localField: 'employeeId',
+            foreignField: 'employeeId',
+            as: 'employeeSummary'
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                employeeId: 1,
+                fullName: 1,
+                services: 1,
+                photo: 1,
+                phoneNumber: 1,
+            }
+        }
+    ];
+
+    console.log("Pipeline:", JSON.stringify(pipeline, null, 2));
+
+    const helpers = await Helper.aggregate(pipeline);
+
+    console.log("Filtered Helpers:", helpers);
+
+    res.json(helpers);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
 
 
 router.patch('/:employeeId', upload.fields([
@@ -144,6 +241,10 @@ router.patch('/:employeeId', upload.fields([
         otherDocType
       } = req.body;
 
+
+        console.log('Request Body:', req.body);
+        console.log('Files:', req.files);
+
       const existingHelper = await Helper.findOne({ employeeId });
 
       if (!existingHelper) {
@@ -153,7 +254,7 @@ router.patch('/:employeeId', upload.fields([
       const updatedFields = {
         fullName,
         email,
-        services: JSON.parse(services || '[]'),
+        services,
         organization,
         languages: JSON.parse(languages || '[]'),
         gender,
@@ -165,8 +266,10 @@ router.patch('/:employeeId', upload.fields([
         otherDocType,
         photo: req.files['photo']?.[0]?.path,
         kycDocument: req.files['kycDocument']?.[0]?.path,
-        otherDocument: req.files['otherDocument']?.[0]?.path
+        otherDocument: req.files['otherDocument']?.[0]?.path || ''
       };
+
+    //   console.log('Updated Fields:', updatedFields);
 
       const updatedHelper = await Helper.findOneAndUpdate(
         { employeeId },
@@ -178,15 +281,16 @@ router.patch('/:employeeId', upload.fields([
         { employeeId },
         {
           fullName,
-          services: JSON.parse(services || '[]'),
-          photo: updatedFields.photo
+          services,
+          photo: updatedFields.photo,
+          phoneNumber
         }
       );
 
       res.status(200).json({ message: 'Helper updated successfully', updatedHelper });
 
     } catch (error) {
-      console.error('Error updating helper:', error);
+    //   console.error('Error updating helper:', error);
       res.status(500).json({ message: 'Failed to update helper' });
     }
   }
@@ -198,7 +302,7 @@ router.delete('/:employeeId', async (req,res) => {
         const {employeeId} = req.params;
         const helper = await Helper.deleteMany({employeeId: employeeId});
         const helperSummary = await EmployeeSummary.deleteMany({employeeId: employeeId});
-        console.log(helper.acknowledged)
+        // console.log(helper.acknowledged)
         res.status(200).json({ message: helper.acknowledged+" "+helperSummary.acknowledged})
     } catch (error) {
         res.status(500).json({ err: 'Error occured' });
