@@ -17,7 +17,7 @@ const helperSchema = new mongoose.Schema({
     kycDocType: String,
     otherDocument: String,
     otherDocType: String,
-    joinedDate: {type: Date, default: Date.now}
+    joinedDate: Date
 });
 
 module.exports = mongoose.model('Helper', helperSchema);
