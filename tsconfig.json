@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2019",                // modern JS features, but safe for Node
+    "module": "commonjs",              // matches your "type": "commonjs" in package.json
+    "esModuleInterop": true,           // allows default imports from CommonJS modules
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,                    // enables all strict type checks
+    "skipLibCheck": true,              // speeds up builds
+    "outDir": "./dist",                // compiled JS output
+    "rootDir": "./",                   // where your TS source files are
+    "sourceMap": true,                 // helps debugging TS in Node
+    "declaration": true                // generates .d.ts type files
+  },
+  "include": ["*.ts"],                 // include your files (app.ts, index.ts, etc.)
+  "exclude": ["node_modules", "dist"]  // exclude build artifacts
+}
